@@ -56,7 +56,11 @@ pub struct Header {
     /// Unused 64-bit hash, always zero.
     pub nonce: B64,
     /// Base fee paid by all transactions in the block.
+    #[cfg(not(feature = "optimism"))]
     pub base_fee_per_gas: U256,
+    /// Optional base fee paid by all transactions in the block.
+    #[cfg(feature = "optimism")]
+    pub base_fee_per_gas: Option<U256>,
     /// Root hash of the trie containing all withdrawals in the block. Present after the
     /// Shanghai update.
     #[serde(default)]
@@ -82,7 +86,10 @@ impl Default for Header {
             extra_data: Bytes::new(),
             mix_hash: B256::ZERO,
             nonce: B64::ZERO,
+            #[cfg(not(feature = "optimism"))]
             base_fee_per_gas: U256::ZERO,
+            #[cfg(feature = "optimism")]
+            base_fee_per_gas: None,
             withdrawals_root: None,
         }
     }

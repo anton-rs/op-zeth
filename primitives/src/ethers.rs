@@ -108,9 +108,12 @@ impl<T> TryFrom<EthersBlock<T>> for Header {
             extra_data: block.extra_data.0.into(),
             mix_hash: block.mix_hash.context("mix_hash missing")?.0.into(),
             nonce: block.nonce.context("nonce missing")?.0.into(),
+            #[cfg(not(feature = "optimism"))]
             base_fee_per_gas: from_ethers_u256(
                 block.base_fee_per_gas.context("base_fee_per_gas missing")?,
             ),
+            #[cfg(feature = "optimism")]
+            base_fee_per_gas: block.base_fee_per_gas.map(from_ethers_u256),
             withdrawals_root: block.withdrawals_root.map(from_ethers_h256),
         })
     }

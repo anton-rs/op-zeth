@@ -24,6 +24,8 @@ use revm::{
     },
     Database, DatabaseCommit, EVM,
 };
+#[cfg(feature = "optimism")]
+use zeth_primitives::optimism::TxDeposit;
 use zeth_primitives::{
     receipt::Receipt,
     revm::{to_revm_b160, to_revm_b256},
@@ -82,7 +84,7 @@ impl TxExecStrategy for EthTxExecStrategy {
             info!("  Withdrawals: {}", block_builder.input.withdrawals.len());
             info!("  Fee Recipient: {:?}", block_builder.input.beneficiary);
             info!("  Gas limit: {}", block_builder.input.gas_limit);
-            info!("  Base fee per gas: {}", header.base_fee_per_gas);
+            info!("  Base fee per gas: {:?}", header.base_fee_per_gas);
             info!("  Extra data: {:?}", block_builder.input.extra_data);
         }
 
@@ -100,7 +102,10 @@ impl TxExecStrategy for EthTxExecStrategy {
             timestamp: block_builder.input.timestamp,
             difficulty: U256::ZERO,
             prevrandao: Some(to_revm_b256(block_builder.input.mix_hash)),
+            #[cfg(not(feature = "optimism"))]
             basefee: header.base_fee_per_gas,
+            #[cfg(feature = "optimism")]
+            basefee: header.base_fee_per_gas.unwrap_or_default(),
             gas_limit: block_builder.input.gas_limit,
         };
 
@@ -311,6 +316,27 @@ fn fill_tx_env(tx_env: &mut TxEnv, tx: &Transaction, caller: Address) {
             tx_env.chain_id = Some(tx.chain_id);
             tx_env.nonce = Some(tx.nonce);
             tx_env.access_list = tx.access_list.clone().into();
+        }
+        #[cfg(feature = "optimism")]
+        TxEssence::Deposit(TxDeposit {
+            to,
+            value,
+            gas_limit,
+            input,
+            ..
+        }) => {
+            tx_env.gas_limit = *gas_limit;
+            tx_env.gas_price = U256::ZERO;
+            tx_env.gas_priority_fee = None;
+            tx_env.transact_to = if let TransactionKind::Call(to_addr) = to {
+                TransactTo::Call(to_revm_b160(*to_addr))
+            } else {
+                TransactTo::create()
+            };
+            tx_env.value = U256::from(*value);
+            tx_env.data = input.0.clone();
+            tx_env.chain_id = None;
+            tx_env.nonce = None;
         }
     };
 }

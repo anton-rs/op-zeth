@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
 
         if validated_header.base_fee_per_gas != init.fini_block.base_fee_per_gas {
             error!(
-                "Base fee mismatch {} (expected {})",
+                "Base fee mismatch {:?} (expected {:?})",
                 validated_header.base_fee_per_gas, init.fini_block.base_fee_per_gas
             );
         }

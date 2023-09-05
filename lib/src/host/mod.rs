@@ -82,6 +82,8 @@ pub fn get_initial_data(
         init_block.hash.unwrap()
     );
 
+    info!("Initial block: {:?}", init_block);
+
     // Fetch the finished block
     let fini_block = provider.get_full_block(&BlockQuery { block_no })?;
 

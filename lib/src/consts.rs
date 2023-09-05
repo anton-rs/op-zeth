@@ -65,6 +65,26 @@ pub static ETH_MAINNET_CHAIN_SPEC: Lazy<ChainSpec> = Lazy::new(|| {
     }
 });
 
+/// The Ethereum goerli specification.
+// pub static ETH_GOERLI_CHAIN_SPEC: Lazy<ChainSpec> = Lazy::new(|| {
+//     ChainSpec {
+//         chain_id: 5,
+//         hard_forks: BTreeMap::from([
+//             (SpecId::FRONTIER, ForkCondition::Block(0)),
+//             // previous versions not supported
+//             (SpecId::MERGE, ForkCondition::TTD { fork_block: None, total_difficulty:
+// U256::from(10_790_000) }),             (SpecId::SHANGHAI, ForkCondition::Timestamp(1678832736)),
+//             (SpecId::CANCUN, ForkCondition::TBD),
+//         ]),
+//         eip_1559_constants: Eip1559Constants {
+//             base_fee_change_denominator: uint!(8_U256),
+//             base_fee_max_increase_denominator: uint!(8_U256),
+//             base_fee_max_decrease_denominator: uint!(8_U256),
+//             elasticity_multiplier: uint!(2_U256),
+//         },
+//     }
+// });
+
 /// The condition at which a fork is activated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ForkCondition {

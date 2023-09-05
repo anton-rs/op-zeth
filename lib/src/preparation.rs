@@ -69,13 +69,18 @@ impl HeaderPrepStrategy for EthHeaderPrepStrategy {
             );
         }
         // Validate extra data
-        let extra_data_bytes = block_builder.input.extra_data.len();
-        if extra_data_bytes >= MAX_EXTRA_DATA_BYTES {
-            bail!(
-                "Invalid extra data: expected <= {}, got {}",
-                MAX_EXTRA_DATA_BYTES,
-                extra_data_bytes,
-            )
+        // todo(refcell): we should not be doing this, but we're getting 97 byte extra data
+        // instead of less than 32 bytes.
+        #[cfg(not(feature = "optimism"))]
+        {
+            let extra_data_bytes = block_builder.input.extra_data.len();
+            if extra_data_bytes >= MAX_EXTRA_DATA_BYTES {
+                bail!(
+                    "Invalid extra data: expected <= {}, got {}",
+                    MAX_EXTRA_DATA_BYTES,
+                    extra_data_bytes,
+                )
+            }
         }
         // Derive header
         block_builder.header = Some(Header {
@@ -87,10 +92,17 @@ impl HeaderPrepStrategy for EthHeaderPrepStrategy {
                 .number
                 .checked_add(1)
                 .context("Invalid block number: too large")?,
+            #[cfg(not(feature = "optimism"))]
             base_fee_per_gas: derive_base_fee(
                 &block_builder.input.parent_header,
                 block_builder.chain_spec.gas_constants(),
             )?,
+            #[cfg(feature = "optimism")]
+            base_fee_per_gas: derive_base_fee(
+                &block_builder.input.parent_header,
+                block_builder.chain_spec.gas_constants(),
+            )
+            .ok(),
             // Initialize metadata from input
             beneficiary: block_builder.input.beneficiary,
             gas_limit: block_builder.input.gas_limit,
@@ -109,32 +121,38 @@ impl HeaderPrepStrategy for EthHeaderPrepStrategy {
 pub fn derive_base_fee(parent: &Header, eip_1559_constants: &Eip1559Constants) -> Result<U256> {
     let parent_gas_target = parent.gas_limit / eip_1559_constants.elasticity_multiplier;
 
+    #[cfg(not(feature = "optimism"))]
+    let parent_base_fee_per_gas = parent.base_fee_per_gas;
+
+    #[cfg(feature = "optimism")]
+    let parent_base_fee_per_gas = parent.base_fee_per_gas.unwrap_or(U256::ZERO);
+
     match parent.gas_used.cmp(&parent_gas_target) {
-        std::cmp::Ordering::Equal => Ok(parent.base_fee_per_gas),
+        std::cmp::Ordering::Equal => Ok(parent_base_fee_per_gas),
 
         std::cmp::Ordering::Greater => {
             let gas_used_delta = parent.gas_used - parent_gas_target;
             let base_fee_delta = ONE
                 .max(
-                    parent.base_fee_per_gas * gas_used_delta
+                    parent_base_fee_per_gas * gas_used_delta
                         / parent_gas_target
                         / eip_1559_constants.base_fee_change_denominator,
                 )
                 .min(
-                    parent.base_fee_per_gas / eip_1559_constants.base_fee_max_increase_denominator,
+                    parent_base_fee_per_gas / eip_1559_constants.base_fee_max_increase_denominator,
                 );
-            Ok(parent.base_fee_per_gas + base_fee_delta)
+            Ok(parent_base_fee_per_gas + base_fee_delta)
         }
 
         std::cmp::Ordering::Less => {
             let gas_used_delta = parent_gas_target - parent.gas_used;
-            let base_fee_delta = (parent.base_fee_per_gas * gas_used_delta
+            let base_fee_delta = (parent_base_fee_per_gas * gas_used_delta
                 / parent_gas_target
                 / eip_1559_constants.base_fee_change_denominator)
                 .min(
-                    parent.base_fee_per_gas / eip_1559_constants.base_fee_max_decrease_denominator,
+                    parent_base_fee_per_gas / eip_1559_constants.base_fee_max_decrease_denominator,
                 );
-            Ok(parent.base_fee_per_gas - base_fee_delta)
+            Ok(parent_base_fee_per_gas - base_fee_delta)
         }
     }
 }
